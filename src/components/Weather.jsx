@@ -3,7 +3,11 @@ import './Weather.css';
 import { FaSearch, FaWind, FaThermometer, FaTemperatureHigh, FaTemperatureLow, FaTachometerAlt, FaEye } from 'react-icons/fa';
 import { MdLocationOn } from 'react-icons/md';
 import { WiHumidity } from 'react-icons/wi';
-import countriesData from './countriesData.json';
+// import countriesData from './countriesData.json';
+import { Country, State, City }  from 'country-state-city'
+
+
+//Changes 1. Use node module for countries, 2. remove previous data if invalid api call is made 3. form validation(disable search button) 4. avoid multiple api calls for the same params selected 
 
 const Weather = () => {
   const [country, setCountry] = useState('');
@@ -14,29 +18,39 @@ const Weather = () => {
   const [cities, setCities] = useState([]);
   const [weather, setWeather] = useState(null);
   const [error, setError] = useState('');
+  const [isFormValid, setIsFormValid] = useState(false);
+  const [prevParams, setPrevParams] = useState({country:'',state:'',city:''})
 
   const API_KEY = '5acc1683650652bab831ecf7d57fd397';
   const weatherApiUrl = `https://api.openweathermap.org/data/2.5/weather?q=${city}&units=metric&appid=${API_KEY}`;
+  // console.log(State.getStatesOfCountry("IN"))
 
   useEffect(() => {
     // Set countries using the example JSON data
-    setCountries(countriesData.countries);
+    setCountries(Country.getAllCountries());
+    
   }, []);
 
   const fetchStates = (selectedCountryCode) => {
-    // Find the selected country in the JSON data
-    const selectedCountry = countries.find((c) => c.country_short_name === selectedCountryCode);
+    // Find the selected country in the module data
+    //const selectedCountry = Country.getCountryByShortName(selectedCountryCode);
+ 
 
     // Set states based on the selected country
-    setStates(selectedCountry ? selectedCountry.states : []);
+    // console.log(selectedCountryCode)
+    setStates(State.getStatesOfCountry(selectedCountryCode));
   };
 
-  const fetchCities = (selectedStateName) => {
-    // Find the selected state in the JSON data
-    const selectedState = states.find((s) => s.state_name === selectedStateName);
+  const fetchCities = (selectedState) => {
+    // Find the selected state in the module data
+    let components = selectedState.split(",")
+    let countrycode = components[0];
+    let statecode = components[1];
+    //console.log(components)
 
     // Set cities based on the selected state
-    setCities(selectedState ? selectedState.cities : []);
+    // console.log(selectedStateCode)
+    setCities(City.getCitiesOfState(countrycode,statecode));
   };
 
   const handleCountryChange = (event) => {
@@ -46,6 +60,7 @@ const Weather = () => {
     setCity('');
     // Fetch states based on the selected country
     fetchStates(selectedCountryCode);
+    setIsFormValid(false); // Reset form validation
   };
 
   const handleStateChange = (event) => {
@@ -53,14 +68,21 @@ const Weather = () => {
     setState(selectedStateName);
     setCity('');
     // Fetch cities based on the selected state
+  
     fetchCities(selectedStateName);
+    setIsFormValid(false); // Reset form validation
   };
 
   const handleCityChange = (event) => {
     setCity(event.target.value);
+    setIsFormValid(!!event.target.value); // Update form validation based on city input
   };
 
   const fetchData = async () => {
+    if(country === prevParams.country && state === prevParams.state && city === prevParams.city){
+      return;
+    }
+
     try {
       const response = await fetch(weatherApiUrl);
       const data = await response.json();
@@ -68,7 +90,9 @@ const Weather = () => {
       if (response.ok) {
         setWeather(data);
         setError('');
+        setPrevParams({ country, state, city });
       } else {
+        setWeather(null);
         setError('No data found. Please enter a valid city name.');
       }
     } catch (error) {
@@ -83,17 +107,18 @@ const Weather = () => {
         <select value={country} onChange={handleCountryChange}>
           <option value='' disabled>Select Country</option>
           {countries.map((country) => (
-            <option key={country.country_short_name} value={country.country_short_name}>
-              {country.country_name}
+            <option key={country.name} value={country.isoCode}>
+              {country.name}
             </option>
           ))}
         </select>
-
+       
         <select value={state} onChange={handleStateChange}>
           <option value='' disabled>Select State</option>
-          {states.map((state, index) => (
-            <option key={index} value={state.state_name}>
-              {state.state_name}
+          {states.map((state) => (
+            
+            <option key={state.name} value={[state.countryCode,state.isoCode]}>
+              {state.name}
             </option>
           ))}
         </select>
@@ -101,13 +126,13 @@ const Weather = () => {
         <select value={city} onChange={handleCityChange}>
           <option value='' disabled>Select City</option>
           {cities.map((city, index) => (
-            <option key={index} value={city}>
-              {city}
+            <option key={index} value={city.name}>
+              {city.name}
             </option>
           ))}
         </select>
 
-        <button onClick={fetchData}>
+        <button onClick={fetchData} disabled={!isFormValid }>
           <FaSearch />
         </button>
       </div>
